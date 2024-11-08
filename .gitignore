@@ -1,0 +1,12 @@
+venv/
+ml_apprenticeship_take_home.git/
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+*.dylib
+*.so
+*.h5
+*.ckpt
+*.pt
