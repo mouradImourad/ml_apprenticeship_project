@@ -1,31 +1,38 @@
 import torch
-import torch.nn as nn
+from torch.optim import AdamW
+from transformers import BertModel
 
-def freeze_entire_model(model):
-    """Freeze all parameters in the model."""
-    for param in model.parameters():
-        param.requires_grad = False
+def get_optimizer_with_layerwise_lr(model: BertModel, base_lr: float = 1e-5, layer_decay: float = 0.9):
+    """
+    Set up an optimizer with layer-wise learning rates for a BERT-based model.
 
+    Args:
+        model (BertModel): The model with a transformer backbone.
+        base_lr (float): The base learning rate for the last layer.
+        layer_decay (float): Multiplicative factor to decrease the learning rate for earlier layers.
 
-def freeze_transformer_backbone(model):
-    """Freeze only the transformer (BERT) backbone, keep task heads trainable."""
-    for param in model.model.parameters():  # Assuming 'model' is the BERT backbone
-        param.requires_grad = False
-
-
-def freeze_task_head(model, task='A'):
-    """Freeze one task-specific head based on the task specified."""
-    if task == 'A':
-        for param in model.classification_head.parameters():
-            param.requires_grad = False
-    elif task == 'B':
-        for param in model.sentiment_head.parameters():
-            param.requires_grad = False
-
-
-def prepare_transfer_learning(model, num_layers_to_freeze=6):
-    """Freeze the first `num_layers_to_freeze` layers of the transformer backbone."""
-    for i, layer in enumerate(model.model.encoder.layer):
-        if i < num_layers_to_freeze:
-            for param in layer.parameters():
-                param.requires_grad = False
+    Returns:
+        optimizer (torch.optim.Optimizer): Optimizer with specified learning rate for each layer.
+    """
+    # Store parameters and assign different learning rates per layer
+    opt_parameters = []
+    num_layers = len(model.encoder.layer)  # Number of transformer layers in the backbone
+    
+    # Decrease learning rate from last layer down to first layer
+    for i in range(num_layers):
+        layer = model.encoder.layer[num_layers - 1 - i]
+        layer_lr = base_lr * (layer_decay ** i)  # Decrease learning rate for earlier layers
+        
+        opt_parameters += [
+            {"params": layer.parameters(), "lr": layer_lr}
+        ]
+    
+    # Set separate learning rates for the final classification and sentiment heads
+    if hasattr(model, "classification_head"):
+        opt_parameters += [{"params": model.classification_head.parameters(), "lr": base_lr}]
+    
+    if hasattr(model, "sentiment_head"):
+        opt_parameters += [{"params": model.sentiment_head.parameters(), "lr": base_lr}]
+    
+    optimizer = AdamW(opt_parameters)
+    return optimizer

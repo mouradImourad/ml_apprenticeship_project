@@ -1,16 +1,17 @@
-from training_utils import (
-    freeze_entire_model,
-    freeze_transformer_backbone,
-    freeze_task_head,
-    prepare_transfer_learning
-)
+from src.training_utils import get_optimizer_with_layerwise_lr
 from src.multi_task_model import MultiTaskSentenceTransformer
 
-# Initialize model
+# Initialize model and optimizer
 model = MultiTaskSentenceTransformer()
+optimizer = get_optimizer_with_layerwise_lr(model.model, base_lr=1e-5, layer_decay=0.9)
 
-# Apply any freezing scenario you need
-freeze_entire_model(model)               # Scenario 1
-freeze_transformer_backbone(model)       # Scenario 2
-freeze_task_head(model, task='A')        # Scenario 3
-prepare_transfer_learning(model, num_layers_to_freeze=6)  # Transfer Learning scenario
+# Example training loop
+for epoch in range(num_epochs):
+    for batch in data_loader:
+        optimizer.zero_grad()
+        # Forward pass
+        output_a, output_b = model(batch["input_text"])
+        # Compute loss and backpropagate
+        loss = compute_loss(output_a, output_b, batch)
+        loss.backward()
+        optimizer.step()
